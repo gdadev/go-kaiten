@@ -1,2 +1,2 @@
 # go-kaiten
-Kaiten Go DSK
+Kaiten Go SDK
