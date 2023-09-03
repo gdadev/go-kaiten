@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-// IssueBoardsService handles communication with the spaces related
+// SpacesService handles communication with the spaces related
 // methods of the Kaiten API.
 type SpacesService struct {
 	client *Client
