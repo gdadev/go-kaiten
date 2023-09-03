@@ -134,31 +134,13 @@ func (c *Client) Do(req *retryablehttp.Request, v interface{}) (*Response, error
 		return nil, err
 	}
 
-	// if resp.StatusCode == http.StatusUnauthorized && c.authType == BasicAuth {
-	// 	resp.Body.Close()
-	// 	// The token most likely expired, so we need to request a new one and try again.
-	// 	if _, err := c.requestOAuthToken(req.Context(), basicAuthToken); err != nil {
-	// 		return nil, err
-	// 	}
-	// 	return c.Do(req, v)
-	// }
-	// defer resp.Body.Close()
-
-	// // If not yet configured, try to configure the rate limiter
-	// // using the response headers we just received. Fail silently
-	// // so the limiter will remain disabled in case of an error.
-	// c.configureLimiterOnce.Do(func() { c.configureLimiter(req.Context(), resp.Header) })
-
-	// response := newResponse(resp)
-
-	// err = CheckResponse(resp)
-	// if err != nil {
-	// 	// Even though there was an error, we still return the response
-	// 	// in case the caller wants to inspect it further.
-	// 	return response, err
-	// }
+	defer resp.Body.Close()
 
 	response := &Response{Response: resp}
+
+	if err = checkResponse(resp); err != nil {
+		return response, err
+	}
 
 	if v != nil {
 		if w, ok := v.(io.Writer); ok {
@@ -169,4 +151,41 @@ func (c *Client) Do(req *retryablehttp.Request, v interface{}) (*Response, error
 	}
 
 	return response, err
+}
+
+type ErrorResponse struct {
+	Body     []byte
+	Response *http.Response
+	Message  string
+}
+
+func (e *ErrorResponse) Error() string {
+	path, _ := url.QueryUnescape(e.Response.Request.URL.Path)
+	u := fmt.Sprintf("%s://%s%s", e.Response.Request.URL.Scheme, e.Response.Request.URL.Host, path)
+	return fmt.Sprintf("%s %s: %d %s", e.Response.Request.Method, u, e.Response.StatusCode, e.Message)
+}
+
+type errorResponseBody struct {
+	Message string `json:"message"`
+}
+
+func checkResponse(r *http.Response) error {
+	if r.StatusCode == 200 {
+		return nil
+	}
+
+	errorResponse := &ErrorResponse{Response: r}
+	data, err := io.ReadAll(r.Body)
+	if err == nil && data != nil {
+		errorResponse.Body = data
+
+		var raw errorResponseBody
+		if err := json.Unmarshal(data, &raw); err != nil {
+			errorResponse.Message = fmt.Sprintf("failed to parse unknown error format: %s", data)
+		} else {
+			errorResponse.Message = raw.Message
+		}
+	}
+
+	return errorResponse
 }
