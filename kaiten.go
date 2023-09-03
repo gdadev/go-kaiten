@@ -26,7 +26,8 @@ type Client struct {
 	token string
 
 	//
-	Spaces *SpacesService
+	Spaces      *SpacesService
+	SpaceBoards *SpaceBoardsService
 }
 
 func NewClient(domain, token string) (*Client, error) {
@@ -43,6 +44,7 @@ func NewClient(domain, token string) (*Client, error) {
 	c.client.Logger = nil
 
 	c.Spaces = &SpacesService{client: c}
+	c.SpaceBoards = &SpaceBoardsService{client: c}
 
 	return c, nil
 }
